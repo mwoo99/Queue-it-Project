@@ -1,33 +1,27 @@
 //module requirements
 //npm i puppeteer puppeteer-extra puppeteer-extra-plugin-stealth  || stealth mode
-//npm i @extra/recaptcha   || captcha solver module
+//npm i puppeteer-extra-plugin-recaptcha   || captcha solver module
 const https = require('https')
 const fs = require('fs');
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const RecaptchaPlugin = require('@extra/recaptcha');
+const RecaptchaPlugin = require('puppeteer-extra-plugin-recaptcha')
 puppeteer.use(StealthPlugin());
-/*
 puppeteer.use(
     RecaptchaPlugin({
       provider: {
         id: '2captcha',
-        token: 'XXXXXXX', // REPLACE THIS WITH YOUR OWN 2CAPTCHA API KEY ⚡
+        token: 'XXXXXX', // REPLACE THIS WITH YOUR OWN 2CAPTCHA API KEY ⚡
       },
       visualFeedback: true, // colorize reCAPTCHAs (violet = detected, green = solved)
     })
   )
-*/
 
 //let saleURL = 'https://google.com';
-//let saleURL = 'https://httpbin.org/headers';
-let saleURL = 'https://bot.sannysoft.com';
-//let saleURL = 'https://patrickhlauke.github.io/recaptcha/';
-//let saleURL = 'https://direct.playstation.com/en-us/hardware/ps5';
+//let saleURL = 'https://bot.sannysoft.com';
+let saleURL = 'https://www.google.com/recaptcha/api2/demo';
 
-var proxies = fs.readFileSync('.\\qbypass_pupp\\proxies.txt').toString().split("\n");
-
-
+var proxies = fs.readFileSync('.\\qbypass_pupp\\proxies.txt').toString().split("\n"); //proxies file IP:PORT:USER:PASS\r\n
  
 async function main(proxy) {
     const proxyarr = proxy.split(":");
@@ -37,10 +31,11 @@ async function main(proxy) {
     const PROXY_USERNAME = proxyarr[2];
     const PROXY_PASSWORD = proxyarr[3];
     const browser = await puppeteer.launch({
-        headless: true,
+        headless: false,
         args: [
-        //   `--proxy-server=http://${PROXY_SERVER_IP}:${PROXY_SERVER_PORT}`,
-        //   "--window-size=300,500"
+           `--proxy-server=http://${PROXY_SERVER_IP}:${PROXY_SERVER_PORT}`,
+           '--disable-features=IsolateOrigins,site-per-process',                 //flags for captcha
+           '--flag-switches-begin --disable-site-isolation-trials --flag-switches-end'
         ]
     });
     
@@ -49,13 +44,9 @@ async function main(proxy) {
         const context = await browser.createIncognitoBrowserContext();
         const page = await context.newPage();
         await page.setDefaultTimeout(0);
-        /*auth proxy
-        await page.authenticate({
-        username: PROXY_USERNAME,
-        password: PROXY_PASSWORD,
-        });*/
+        await page.authenticate({username:PROXY_USERNAME, password:PROXY_PASSWORD}); //auth proxy
 
-        //ignores images, css, etc
+        /*ignores images, css, etc
         await page.setRequestInterception(true);
         page.on('request', (request) => {
             if (['image', 'stylesheet', 'font', 'script'].indexOf(request.resourceType()) !== -1) {
@@ -63,21 +54,26 @@ async function main(proxy) {
             } else {
                 request.continue();
             }
-        });
+        });*/
 
         //set event listener for page
         page.on("domcontentloaded", async (response) =>{
-            //await page.solveRecaptchas();
-            //console.log('response: ', response.status()); handle bans/errors
+            for (const frame of page.mainFrame().childFrames()) {
+                // Attempt to solve any potential captchas in those frames
+                const {captchas,filtered,solutions,solved,error} = await page.solveRecaptchas();
+                console.log(error);
+                if (solved.length>0) {
+                    console.log(solved);
+                    await page.$eval('XXXXXX', elem => elem.click());  // *CHANGE CSS SELECTOR AS NEEDED*
+                }
+            }                                                                                     //use #id or .class, https://www.w3schools.com/cssref/css_selectors.asp
             const mycookies = await page.cookies();
-            console.log(mycookies);
             mycookies.forEach(async thiscookie => {
-                if (thiscookie.name.includes("1P_JAR")) {     //change to includes 'Queue-it-token', when passed queue -> saves session and opens a visible browser with session info
+                if (thiscookie.name.includes("Queue-it-token")) {     //change to includes 'Queue-it-token', when passed queue -> saves session and opens a visible browser with session info
                     console.log("cookie: "+thiscookie.name);
-                    const ls = await page.evaluate(() => JSON.stringify(localStorage));
+                    const ls = await page.evaluate(() => JSON.stringify(localStorage));       //store local and session storage
                     const ss = await page.evaluate(() => JSON.stringify(sessionStorage));
-                    //console.log(ls);
-                    await initHeadfulBrowser(mycookies,ls,ss);
+                    await initHeadfulBrowser(mycookies,ls,ss);                 //open a visible browser and close current browser including all pages
                     await page.removeAllListeners();
                     await browser.close();
                     //if (browser && browser.process() != null) browser.process().kill('SIGINT');
@@ -92,24 +88,18 @@ async function main(proxy) {
 
     //reopen a visible browser and restore session
     const initHeadfulBrowser = (async (cookies,ls,ss)=>{
-        //console.log(ls);
-        //console.log(ss);
         const browser2 = await puppeteer.launch({
             headless: false,
             args: [
-        //   `--proxy-server=http://${PROXY_SERVER_IP}:${PROXY_SERVER_PORT}`,
-            "--window-size=500,500",
+            `--proxy-server=http://${PROXY_SERVER_IP}:${PROXY_SERVER_PORT}`,
+            "--window-size=900,900",
             "--window-position=0,0",
         ]
         })
-        /*auth proxy
-        await page.authenticate({
-        username: PROXY_USERNAME,
-        password: PROXY_PASSWORD,
-        });*/
 
         const headfulPage = await browser2.newPage();
         await headfulPage.setDefaultTimeout(0);
+        await headfulPage.authenticate({username:PROXY_USERNAME, password:PROXY_PASSWORD});
         
         //restore cookies
         await headfulPage.setCookie(...cookies);
@@ -129,7 +119,7 @@ async function main(proxy) {
     })
     
 
-    //opens M incognito pages with unique sessions,cookies,etc | all M pages will use same proxy
+    //opens #M incognito pages with unique sessions,cookies,etc | all M pages will use same proxy
     const openMpages = (async (M,url)=>{
         for (var i=0; i<M ; i++){
             try {
@@ -139,13 +129,14 @@ async function main(proxy) {
             } 
         }
     })
-    openMpages(25,saleURL);    
+    openMpages(1,saleURL);    
 }
 
 //runs for N proxies
 function runNtimes(N){
     for (var i=0; i < N;i++){
-        const proxystr = proxies[(Math.random() * proxies.length) | 0].slice(0,-1);
+        if (i>proxies.length) return;
+        const proxystr = proxies[i].slice(0,-1);//(Math.random() * proxies.length) | 0].slice(0,-1);
         main(proxystr);
     }
 }
