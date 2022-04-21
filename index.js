@@ -3,6 +3,7 @@
 //npm i puppeteer-extra-plugin-recaptcha   || captcha solver module
 const https = require('https')
 const fs = require('fs');
+const fetch = require('node-fetch')
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const RecaptchaPlugin = require('puppeteer-extra-plugin-recaptcha')
@@ -11,17 +12,34 @@ puppeteer.use(
     RecaptchaPlugin({
       provider: {
         id: '2captcha',
-        token: 'XXXXXX', // REPLACE THIS WITH YOUR OWN 2CAPTCHA API KEY ⚡
+        token: 'XXXXXXXX', // REPLACE THIS WITH YOUR OWN 2CAPTCHA API KEY
       },
       visualFeedback: true, // colorize reCAPTCHAs (violet = detected, green = solved)
     })
   )
 
 //let saleURL = 'https://google.com';
-//let saleURL = 'https://bot.sannysoft.com';
-let saleURL = 'https://www.google.com/recaptcha/api2/demo';
-
+let saleURL = 'https://bot.sannysoft.com';
+//let saleURL = 'https://www.google.com/recaptcha/api2/demo';
 var proxies = fs.readFileSync('.\\qbypass_pupp\\proxies.txt').toString().split("\n"); //proxies file IP:PORT:USER:PASS\r\n
+const webHookurl = "XXXXXXX";   //replace with discord webhook
+
+const postURLtoDiscord = async (postURL) => {
+    await fetch(webHookurl, {
+        'method': "POST",
+        'headers': {'content-type':'application/json'},
+        'body': JSON.stringify({
+            username: 'mikelul bot',
+            content: `deez nuts`,
+            embeds: [{
+                title: postURL,
+                url: postURL
+            }]
+        })
+    })
+    .then(res => console.log(res))
+    .catch(err => console.error(err))
+}
  
 async function main(proxy) {
     const proxyarr = proxy.split(":");
@@ -69,11 +87,13 @@ async function main(proxy) {
             }                                                                                     //use #id or .class, https://www.w3schools.com/cssref/css_selectors.asp
             const mycookies = await page.cookies();
             mycookies.forEach(async thiscookie => {
-                if (thiscookie.name.includes("Queue-it-token")) {     //change to includes 'Queue-it-token', when passed queue -> saves session and opens a visible browser with session info
+                if (thiscookie.name.includes("1P_JAR")) {     //change to includes 'Queue-it-token', when passed queue -> saves session and opens a visible browser with session info
                     console.log("cookie: "+thiscookie.name);
-                    const ls = await page.evaluate(() => JSON.stringify(localStorage));       //store local and session storage
-                    const ss = await page.evaluate(() => JSON.stringify(sessionStorage));
-                    await initHeadfulBrowser(mycookies,ls,ss);                 //open a visible browser and close current browser including all pages
+                    //const ls = await page.evaluate(() => JSON.stringify(localStorage));       //store local and session storage
+                    //const ss = await page.evaluate(() => JSON.stringify(sessionStorage));
+                    //await initHeadfulBrowser(mycookies,ls,ss);                 //open a visible browser and close current browser including all pages
+                    await postURLtoDiscord(page.url());
+                    console.log(page.url());
                     await page.removeAllListeners();
                     await browser.close();
                     //if (browser && browser.process() != null) browser.process().kill('SIGINT');
