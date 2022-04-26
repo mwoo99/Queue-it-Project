@@ -3,7 +3,6 @@
 //npm i puppeteer-extra-plugin-recaptcha   || captcha solver module
 const https = require('https')
 const fs = require('fs');
-const fetch = require('node-fetch')
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const RecaptchaPlugin = require('puppeteer-extra-plugin-recaptcha')
@@ -12,19 +11,20 @@ puppeteer.use(
     RecaptchaPlugin({
       provider: {
         id: '2captcha',
-        token: 'XXXXXXXXXXX', // REPLACE THIS WITH YOUR OWN 2CAPTCHA API KEY
+        token: 'XXXXXX', // REPLACE THIS WITH YOUR OWN 2CAPTCHA API KEY ⚡
       },
       visualFeedback: true, // colorize reCAPTCHAs (violet = detected, green = solved)
     })
-);
+  )
 
-/*------------------------------CHANGE THESE VARIABLES BEFORE USE----------------------------------*/
-let N = 1; //# of proxies used
-let M = 1; //# of pages per proxy
+let N = 5; //# of proxies used
+let M = 5; //# of pages per proxy
 let saleURL = 'https://google.com';
-//let saleURL = 'https://direct.playstation.com/en-us/hardware/ps5';
+//let saleURL = 'https://bot.sannysoft.com';
+//let saleURL = 'https://www.google.com/recaptcha/api2/demo';
+
 var proxies = fs.readFileSync('.\\qbypass_pupp\\proxies.txt').toString().split("\n"); //proxies file IP:PORT:USER:PASS\r\n
-const webHookurl = "XXXXXXXXXXXXXXX";   //replace with discord webhook
+const webHookurl = "XXXXXXXXX";   //replace with discord webhook
 /*------------------------------------------------------------------------------------------------*/
 const postURLtoDiscord = async (postURL) => {
     await fetch(webHookurl, {
@@ -42,8 +42,8 @@ const postURLtoDiscord = async (postURL) => {
     .then(res => console.log(res))
     .catch(err => console.error(err))
 }
- 
-async function main(proxy, ifHeadless) {
+
+async function main(proxy) {
     const proxyarr = proxy.split(":");
     console.log(proxyarr);
     const PROXY_SERVER_IP = proxyarr[0];
@@ -51,44 +51,90 @@ async function main(proxy, ifHeadless) {
     const PROXY_USERNAME = proxyarr[2];
     const PROXY_PASSWORD = proxyarr[3];
     const browser = await puppeteer.launch({
-        headless: ifHeadless,
+        headless: true,
         args: [
            `--proxy-server=http://${PROXY_SERVER_IP}:${PROXY_SERVER_PORT}`,
            '--disable-features=IsolateOrigins,site-per-process',                 //flags for captcha
            '--flag-switches-begin --disable-site-isolation-trials --flag-switches-end'
         ]
     });
+    
 
     const initPage = (async (url)=>{
         const context = await browser.createIncognitoBrowserContext();
         const page = await context.newPage();
         await page.setDefaultTimeout(0);
         await page.authenticate({username:PROXY_USERNAME, password:PROXY_PASSWORD}); //auth proxy
-        //await page.setRequestInterception(true);
+
+        /*ignores images, css, etc
+        await page.setRequestInterception(true);
+        page.on('request', (request) => {
+            if (['image', 'stylesheet', 'font', 'script'].indexOf(request.resourceType()) !== -1) {
+                request.abort();
+            } else {
+                request.continue();
+            }
+        });*/
 
         //set event listener for page
         page.on("load", async () =>{
             for (const frame of page.mainFrame().childFrames()) {
                 // Attempt to solve any potential captchas in those frames
                 const {captchas,filtered,solutions,solved,error} = await page.solveRecaptchas();
+                //console.log(error);
                 if (solved.length>0) {
                     console.log(solved);
                     //await page.$eval('XXXXXX', elem => elem.click());  // *CHANGE CSS SELECTOR AS NEEDED*
-                }}
-            });                                                                                     //use #id or .class, https://www.w3schools.com/cssref/css_selectors.asp
-        
-        page.on("request", async (request) =>{
-            //console.log(request.method() + request.url());
-            if (request.method() == 'GET'){
-                if (request.url().includes("queueittoken")) {
-                    await postURLtoDiscord(request.url());
+                }
+            }                                                                                     //use #id or .class, https://www.w3schools.com/cssref/css_selectors.asp
+            const mycookies = await page.cookies();
+            mycookies.forEach(async thiscookie => {
+                if (thiscookie.name.includes("QueueITAccepted")) {     //change to includes 'Queue-it-token', when passed queue -> saves session and opens a visible browser with session info
+                    console.log("cookie: "+thiscookie.name);
+                    const ls = await page.evaluate(() => JSON.stringify(localStorage));       //store local and session storage
+                    const ss = await page.evaluate(() => JSON.stringify(sessionStorage));
+                    await initHeadfulBrowser(mycookies,ls,ss);                 //open a visible browser and close current browser including all pages
                     await page.removeAllListeners();
                     await browser.close();
                 }
-            }}
-            );
+            }
+            ); 
+        })
         await page.goto(url,{waitUntil: "networkidle0"});
     });
+
+    //reopen a visible browser and restore session
+    const initHeadfulBrowser = (async (cookies,ls,ss)=>{
+        const browser2 = await puppeteer.launch({
+            headless: false,
+            args: [
+            `--proxy-server=http://${PROXY_SERVER_IP}:${PROXY_SERVER_PORT}`,
+            "--window-size=900,900",
+            "--window-position=0,0",
+        ]
+        })
+
+        const headfulPage = await browser2.newPage();
+        await headfulPage.setDefaultTimeout(0);
+        await headfulPage.authenticate({username:PROXY_USERNAME, password:PROXY_PASSWORD});
+        
+        //restore cookies
+        await headfulPage.setCookie(...cookies);
+        await headfulPage.goto(saleURL);
+
+        //restore localstorage and sessionstorage
+        await headfulPage.evaluate(ls => {
+            for (const key in ls) {
+              localStorage.setItem(key, ls[key]);
+            }
+        }, ls);
+        await headfulPage.evaluate(ss => {
+            for (const key in ss) {
+              sessionStorage.setItem(key, ss[key]);
+            }
+        }, ss);  
+    })
+    
 
     //opens #M incognito pages with unique sessions,cookies,etc | all M pages will use same proxy
     const openMpages = (async (url)=>{
@@ -104,11 +150,12 @@ async function main(proxy, ifHeadless) {
 }
 
 //runs for N proxies
-async function runNtimes(){
+function runNtimes(){
     for (var i=0; i < N;i++){
         if (i>proxies.length) return;
         const proxystr = proxies[i].slice(0,-1);//(Math.random() * proxies.length) | 0].slice(0,-1);
-        await main(proxystr, true);
+        //await main(proxystr);
+        setTimeout(main, 5000*i, proxystr);
     }
 }
 
