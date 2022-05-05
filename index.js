@@ -19,10 +19,13 @@ puppeteer.use(
       visualFeedback: true, // colorize reCAPTCHAs (violet = detected, green = solved)
     })
 );
+process.setMaxListeners(Infinity);
 
 /*------------------------------CHANGE THESE VARIABLES BEFORE USE----------------------------------*/
-let N = 15; //# of proxies used
+let N = 2; //# of proxies used
 let M = 1; //# of pages per proxy
+let headless = true;
+let ifRecaptcha = false;
 let saleURL = 'https://google.com';
 //let saleURL = 'https://direct.playstation.com/en-us/hardware/ps5';
 var proxies = fs.readFileSync('.\\proxies.txt').toString().split("\n"); //proxies file IP:PORT:USER:PASS\r\n
@@ -45,7 +48,7 @@ const postURLtoDiscord = async (postURL) => {
     .catch(err => console.error(err))
 }
  
-async function main(proxy, ifHeadless) {
+async function main(proxy, ifHeadless, ifRecaptcha) {
     const proxyarr = proxy.split(":");
     console.log(proxyarr);
     const PROXY_SERVER_IP = proxyarr[0];
@@ -69,16 +72,17 @@ async function main(proxy, ifHeadless) {
         //await page.setRequestInterception(true);
 
         //set event listener for page
-        page.on("load", async () =>{
-            for (const frame of page.mainFrame().childFrames()) {
-                // Attempt to solve any potential captchas in those frames
-                const {captchas,filtered,solutions,solved,error} = await page.solveRecaptchas();
-                if (solved.length>0) {
-                    console.log(solved);
-                    //await page.$eval('XXXXXX', elem => elem.click());  // *CHANGE CSS SELECTOR AS NEEDED*
-                }}
-            });                                                                                     //use #id or .class, https://www.w3schools.com/cssref/css_selectors.asp
-        
+        if (ifRecaptcha){
+            page.on("load", async () =>{
+                for (const frame of page.mainFrame().childFrames()) {
+                    // Attempt to solve any potential captchas in those frames
+                    const {captchas,filtered,solutions,solved,error} = await page.solveRecaptchas();
+                    if (solved.length>0) {
+                        console.log(solved);
+                        //await page.$eval('XXXXXX', elem => elem.click());  // *CHANGE CSS SELECTOR AS NEEDED*
+                    }}
+                });                                                                                     //use #id or .class, https://www.w3schools.com/cssref/css_selectors.asp
+        }
         page.on("request", async (request) =>{
             //console.log(request.method() + request.url());
             if (request.method() == 'GET'){
@@ -110,7 +114,7 @@ async function runNtimes(){
     for (var i=0; i < N;i++){
         if (i>proxies.length) return;
         const proxystr = proxies[i].slice(0,-1);//(Math.random() * proxies.length) | 0].slice(0,-1);
-        await setTimeout(main, 2500*i, proxystr, true);
+        await setTimeout(main, 900*i, proxystr, headless, ifRecaptcha);
     }
 }
 
