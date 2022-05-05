@@ -1,6 +1,8 @@
-//module requirements
-//npm i puppeteer puppeteer-extra puppeteer-extra-plugin-stealth  || stealth mode
-//npm i puppeteer-extra-plugin-recaptcha   || captcha solver module
+/*
+module requirements:
+npm i puppeteer puppeteer-extra puppeteer-extra-plugin-stealth  
+npm i puppeteer-extra-plugin-recaptcha
+*/   
 const https = require('https')
 const fs = require('fs');
 const fetch = require('node-fetch')
@@ -19,11 +21,11 @@ puppeteer.use(
 );
 
 /*------------------------------CHANGE THESE VARIABLES BEFORE USE----------------------------------*/
-let N = 1; //# of proxies used
+let N = 15; //# of proxies used
 let M = 1; //# of pages per proxy
 let saleURL = 'https://google.com';
 //let saleURL = 'https://direct.playstation.com/en-us/hardware/ps5';
-var proxies = fs.readFileSync('.\\qbypass_pupp\\proxies.txt').toString().split("\n"); //proxies file IP:PORT:USER:PASS\r\n
+var proxies = fs.readFileSync('.\\proxies.txt').toString().split("\n"); //proxies file IP:PORT:USER:PASS\r\n
 const webHookurl = "XXXXXXXXXXXXXXX";   //replace with discord webhook
 /*------------------------------------------------------------------------------------------------*/
 const postURLtoDiscord = async (postURL) => {
@@ -108,8 +110,8 @@ async function runNtimes(){
     for (var i=0; i < N;i++){
         if (i>proxies.length) return;
         const proxystr = proxies[i].slice(0,-1);//(Math.random() * proxies.length) | 0].slice(0,-1);
-        await main(proxystr, true);
+        await setTimeout(main, 2500*i, proxystr, true);
     }
 }
 
-runNtimes(); //edit to number of proxies you want to run
+runNtimes();
