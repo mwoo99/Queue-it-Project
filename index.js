@@ -59,8 +59,6 @@ async function main(proxy, ifHeadless, ifRecaptcha) {
         headless: ifHeadless,
         args: [
            `--proxy-server=http://${PROXY_SERVER_IP}:${PROXY_SERVER_PORT}`,
-           '--disable-features=IsolateOrigins,site-per-process',                 //flags for captcha
-           '--flag-switches-begin --disable-site-isolation-trials --flag-switches-end'
         ]
     });
 
