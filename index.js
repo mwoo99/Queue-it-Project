@@ -14,7 +14,7 @@ puppeteer.use(
     RecaptchaPlugin({
       provider: {
         id: '2captcha',
-        token: 'XXXXXXXXXXX', // REPLACE THIS WITH YOUR OWN 2CAPTCHA API KEY
+        token: 'XXXXXXXXXXXXXXXXXXXXXXX', // REPLACE THIS WITH YOUR OWN 2CAPTCHA API KEY
       },
       visualFeedback: true, // colorize reCAPTCHAs (violet = detected, green = solved)
     })
@@ -22,14 +22,13 @@ puppeteer.use(
 process.setMaxListeners(Infinity);
 
 /*------------------------------CHANGE THESE VARIABLES BEFORE USE----------------------------------*/
-let N = 2; //# of proxies used
+let N = 1; //# of proxies used
 let M = 1; //# of pages per proxy
-let headless = true;
-let ifRecaptcha = false;
-let saleURL = 'https://google.com';
-//let saleURL = 'https://direct.playstation.com/en-us/hardware/ps5';
+let headless = false;
+let ifRecaptcha = true;
+let saleURL = 'https://google.com.com';
 var proxies = fs.readFileSync('.\\proxies.txt').toString().split("\n"); //proxies file IP:PORT:USER:PASS\r\n
-const webHookurl = "XXXXXXXXXXXXXXX";   //replace with discord webhook
+const webHookurl = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX";   //replace with discord webhook
 /*------------------------------------------------------------------------------------------------*/
 const postURLtoDiscord = async (postURL) => {
     await fetch(webHookurl, {
@@ -48,7 +47,7 @@ const postURLtoDiscord = async (postURL) => {
     .catch(err => console.error(err))
 }
  
-async function main(proxy, ifHeadless, ifRecaptcha) {
+async function main(proxy, taskindex, ifHeadless, ifRecaptcha) {
     const proxyarr = proxy.split(":");
     console.log(proxyarr);
     const PROXY_SERVER_IP = proxyarr[0];
@@ -67,7 +66,6 @@ async function main(proxy, ifHeadless, ifRecaptcha) {
         const page = await context.newPage();
         await page.setDefaultTimeout(0);
         await page.authenticate({username:PROXY_USERNAME, password:PROXY_PASSWORD}); //auth proxy
-        //await page.setRequestInterception(true);
 
         //set event listener for page
         if (ifRecaptcha){
@@ -83,15 +81,43 @@ async function main(proxy, ifHeadless, ifRecaptcha) {
         }
         page.on("request", async (request) =>{
             //console.log(request.method() + request.url());
+            //console.log(request.response());
             if (request.method() == 'GET'){
                 if (request.url().includes("queueittoken")) {
+                    //console.log(request.url());
                     await postURLtoDiscord(request.url());
                     await page.removeAllListeners();
                     await browser.close();
                 }
-            }}
-            );
+                //reload if there was an error? (solving captcha, etc)
+                if (request.url().includes('error')){
+                    console.log("Reloading page from task "+taskindex);
+                    initPage(url);
+                    page.close();
+                }
+            }
+        });
+
+        //catch and print progress in queue line
+        page.on("response", async (response) =>{
+            try {
+                if (response.request().method() == 'POST') {
+                    if (response.request().url().includes('status')){
+                        if (response.headers()['content-type'].includes('application/json')){ 
+                            var resp_json = await response.json();
+                            if ('ticket' in resp_json) console.log("Task:"+taskindex+" - Ticket:"+resp_json.ticket.progress); //resp_json.ticket.progress
+                        }
+                    }
+                }
+            }
+            catch (error) {
+                //console.log(error);
+            };
+        });
+
+
         await page.goto(url,{waitUntil: "networkidle0"});
+
     });
 
     //opens #M incognito pages with unique sessions,cookies,etc | all M pages will use same proxy
@@ -112,7 +138,7 @@ async function runNtimes(){
     for (var i=0; i < N;i++){
         if (i>proxies.length) return;
         const proxystr = proxies[i].slice(0,-1);//(Math.random() * proxies.length) | 0].slice(0,-1);
-        await setTimeout(main, 900*i, proxystr, headless, ifRecaptcha);
+        await setTimeout(main, 2000*i, proxystr, i, headless, ifRecaptcha);
     }
 }
 
