@@ -8,7 +8,7 @@ Requirements:
 Format: SERVER_IP:SERVER_PORT:USERNAME:PASSWORD\
 Example: \
 123.456.78.900:1111:username1:pass1\
-123.456.78.901:1234:username1:pass2
+123.456.78.901:1111:username1:pass2
 
 3. Update options.txt\
 a. Copy/Paste 2CAPTCHA KEY, discord webhook, sale url\
