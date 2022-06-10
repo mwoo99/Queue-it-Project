@@ -1,0 +1,5 @@
+Sale_URL:https://google.com
+Captcha_Key:abcdefgh
+Num_Proxies:2
+Num_Proxy_Browsers:1
+Discord_Webhook:https://discord.com/api/webhooks/1234

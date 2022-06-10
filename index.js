@@ -9,12 +9,21 @@ const fetch = require('node-fetch')
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const RecaptchaPlugin = require('puppeteer-extra-plugin-recaptcha')
+const options_dict = {};
+fs.readFileSync('./options.txt', 'utf8').split("\r\n").map(add_dict);
+function add_dict(item) {
+    var i = item.indexOf(":");
+    var keyvalarr = [item.slice(0,i), item.slice(i+1)];
+    options_dict[keyvalarr[0]] = keyvalarr[1];
+}
+console.log(options_dict);
+const proxies = fs.readFileSync('.\\proxies.txt').toString().split("\n"); //proxies file IP:PORT:USER:PASS\r\n
 puppeteer.use(StealthPlugin());
 puppeteer.use(
     RecaptchaPlugin({
       provider: {
         id: '2captcha',
-        token: 'XXXXXXXXXXXXXXXXXXXXXXX', // REPLACE THIS WITH YOUR OWN 2CAPTCHA API KEY
+        token: options_dict["Captcha_Key"], // REPLACE THIS WITH YOUR OWN 2CAPTCHA API KEY
       },
       visualFeedback: true, // colorize reCAPTCHAs (violet = detected, green = solved)
     })
@@ -22,16 +31,11 @@ puppeteer.use(
 process.setMaxListeners(Infinity);
 
 /*------------------------------CHANGE THESE VARIABLES BEFORE USE----------------------------------*/
-let N = 1; //# of proxies used
-let M = 1; //# of pages per proxy
-let headless = false;
+let headless = true;
 let ifRecaptcha = true;
-let saleURL = 'https://google.com.com';
-var proxies = fs.readFileSync('.\\proxies.txt').toString().split("\n"); //proxies file IP:PORT:USER:PASS\r\n
-const webHookurl = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX";   //replace with discord webhook
 /*------------------------------------------------------------------------------------------------*/
 const postURLtoDiscord = async (postURL) => {
-    await fetch(webHookurl, {
+    await fetch(options_dict["Discord_Webhook"], {
         'method': "POST",
         'headers': {'content-type':'application/json'},
         'body': JSON.stringify({
@@ -49,7 +53,6 @@ const postURLtoDiscord = async (postURL) => {
  
 async function main(proxy, taskindex, ifHeadless, ifRecaptcha) {
     const proxyarr = proxy.split(":");
-    console.log(proxyarr);
     const PROXY_SERVER_IP = proxyarr[0];
     const PROXY_SERVER_PORT = proxyarr[1];
     const PROXY_USERNAME = proxyarr[2];
@@ -84,7 +87,7 @@ async function main(proxy, taskindex, ifHeadless, ifRecaptcha) {
             //console.log(request.response());
             if (request.method() == 'GET'){
                 if (request.url().includes("queueittoken")) {
-                    //console.log(request.url());
+                    console.log(request.url());
                     await postURLtoDiscord(request.url());
                     await page.removeAllListeners();
                     await browser.close();
@@ -122,7 +125,7 @@ async function main(proxy, taskindex, ifHeadless, ifRecaptcha) {
 
     //opens #M incognito pages with unique sessions,cookies,etc | all M pages will use same proxy
     const openMpages = (async (url)=>{
-        for (var i=0; i<M ; i++){
+        for (var i=0; i<options_dict["Num_Proxy_Browsers"] ; i++){
             try {
                 initPage(url);
             } catch (error) {
@@ -130,16 +133,40 @@ async function main(proxy, taskindex, ifHeadless, ifRecaptcha) {
             } 
         }
     })
-    openMpages(saleURL);    
+    openMpages(options_dict["Sale_URL"]);
+    console.log("Launching task #"+taskindex);
+    console.log(proxyarr);    
+}
+
+const keypress = async () => {
+    console.log("Confirm success entering queue-it waiting room and press Enter to continue");
+    process.stdin.setRawMode(true)
+    return new Promise(resolve => process.stdin.on('data', data => {
+        const byteArray = [...data]
+        if (byteArray[0] === 13) {   //user pressed enter
+            console.log("Confirmation received. Launching tasks");
+            process.stdin.setRawMode(false)
+            process.stdin.destroy();
+            resolve();
+        }
+        if (byteArray.length > 0 && byteArray[0] === 3) {
+            console.log('^C')
+            process.exit(1)
+        }
+    }))
 }
 
 //runs for N proxies
 async function runNtimes(){
-    for (var i=0; i < N;i++){
+    await main(proxies[0].slice(0,-1),0,false,true);
+
+    await keypress();
+    for (var i=1; i <= options_dict["Num_Proxies"];i++){
         if (i>proxies.length) return;
         const proxystr = proxies[i].slice(0,-1);//(Math.random() * proxies.length) | 0].slice(0,-1);
         await setTimeout(main, 2000*i, proxystr, i, headless, ifRecaptcha);
     }
 }
 
+console.log("Press Ctrl+C at any time to exit");
 runNtimes();
